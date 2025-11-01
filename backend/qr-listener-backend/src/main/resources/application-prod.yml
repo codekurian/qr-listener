@@ -1,0 +1,59 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://db:5432/qr_listener_prod
+    username: qr_user_prod
+    password: ${DB_PASSWORD:your_secure_password_here}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: false
+
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+logging:
+  level:
+    com.qr: INFO
+    org.springframework: WARN
+    org.hibernate: WARN
+  file:
+    name: /home/user/logs/qr-backend.log
+  pattern:
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# Production-specific configurations
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when-authorized
+
+# CORS configuration for production
+cors:
+  allowed-origins:
+    - https://graceshoppee.tech
+    - https://www.graceshoppee.tech
+  allowed-methods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+    - OPTIONS
+  allowed-headers: "*"
+  allow-credentials: true
+  max-age: 3600
+
+# QR Redirect Configuration
+qr:
+  redirect:
+    base-url: http://graceshoppee.tech:8080

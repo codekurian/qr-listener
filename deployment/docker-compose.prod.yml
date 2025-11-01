@@ -1,0 +1,99 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: qr-listener-postgres-prod
+    environment:
+      POSTGRES_DB: qr_listener_prod
+      POSTGRES_USER: qr_user_prod
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db-prod.sql:/docker-entrypoint-initdb.d/init-db-prod.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: qr-listener-redis-prod
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  backend:
+    image: openjdk:17-jdk-slim
+    container_name: qr-listener-backend-prod
+    working_dir: /app
+    command: sh -c "apt-get update && apt-get install -y maven && mvn clean package -DskipTests && java -jar target/qr-listener-backend-1.0.0.jar --spring.profiles.active=prod"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/qr_listener_prod
+      SPRING_DATASOURCE_USERNAME: qr_user_prod
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      SERVER_PORT: 8080
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+    volumes:
+      - ./backend/qr-listener-backend:/app
+
+  frontend:
+    image: node:18-alpine
+    container_name: qr-listener-frontend-prod
+    working_dir: /app
+    command: sh -c "npm install && npm run build && npm start"
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: https://graceshoppee.tech/api
+      PORT: 3000
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_started
+    restart: unless-stopped
+    volumes:
+      - ./frontend:/app
+
+  nginx:
+    image: nginx:alpine
+    container_name: qr-listener-nginx-prod
+    volumes:
+      - ./nginx-config.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      frontend:
+        condition: service_started
+    restart: unless-stopped
+
+  certbot:
+    image: certbot/certbot
+    container_name: qr-listener-certbot-prod
+    volumes:
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    command: certonly --webroot -w /var/www/certbot --email ${CERTBOT_EMAIL} --agree-tos --no-eff-email -d ${DOMAIN} -d ${WWW_DOMAIN}
+    depends_on:
+      nginx:
+        condition: service_started
+
+volumes:
+  postgres_data:
