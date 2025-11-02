@@ -16,7 +16,7 @@ interface QrCode {
 
 async function fetchRecentQrCodes(): Promise<QrCode[]> {
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080'
-  const response = await fetch(`${apiBaseUrl}/api/admin/qr?limit=5&sort=createdAt&order=desc`)
+  const response = await fetch(`${apiBaseUrl}/api/admin/qr-codes/recent?limit=5`)
   if (!response.ok) {
     throw new Error('Failed to fetch QR codes')
   }

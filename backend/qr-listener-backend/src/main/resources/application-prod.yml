@@ -38,11 +38,13 @@ management:
     health:
       show-details: when-authorized
 
-# CORS configuration for production
+# CORS configuration for production (A2 Hosting uses HTTP)
 cors:
   allowed-origins:
-    - https://graceshoppee.tech
-    - https://www.graceshoppee.tech
+    - http://graceshoppee.tech:8080
+    - http://www.graceshoppee.tech:8080
+    - http://graceshoppee.tech
+    - http://www.graceshoppee.tech
   allowed-methods:
     - GET
     - POST

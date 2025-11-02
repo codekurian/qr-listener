@@ -13,12 +13,13 @@ CREATE TABLE IF NOT EXISTS applications (
     is_active BOOLEAN DEFAULT TRUE
 );
 
--- Insert sample applications if they don't exist
+-- Insert sample applications if they don't exist (ON CONFLICT to prevent overwriting existing data)
 INSERT INTO applications (id, name, base_url, description, contact_email, is_active) VALUES
     (1, 'E-commerce', 'https://shop.graceshoppee.tech', 'QR codes for online store products and promotions', 'shop@graceshoppee.tech', true),
     (2, 'Restaurant', 'https://restaurant.graceshoppee.tech', 'QR codes for menus, reservations, and feedback', 'restaurant@graceshoppee.tech', true),
     (3, 'Event', 'https://events.graceshoppee.tech', 'QR codes for event tickets, schedules, and information', 'events@graceshoppee.tech', true),
-    (4, 'Marketing', 'https://marketing.graceshoppee.tech', 'QR codes for campaigns, advertisements, and lead generation', 'marketing@graceshoppee.tech', true);
+    (4, 'Marketing', 'https://marketing.graceshoppee.tech', 'QR codes for campaigns, advertisements, and lead generation', 'marketing@graceshoppee.tech', true)
+ON CONFLICT (id) DO NOTHING;
 
 -- Reset sequence for applications table if needed
 SELECT setval('applications_id_seq', (SELECT MAX(id) FROM applications));
@@ -40,14 +41,14 @@ CREATE TABLE IF NOT EXISTS qr_codes (
         ON DELETE SET NULL
 );
 
--- Insert sample QR codes if they don't exist
+-- Insert sample QR codes if they don't exist (ON CONFLICT to prevent overwriting existing data)
 -- QR IDs must match pattern: ^[A-Z]{2,10}-[A-Z0-9]{8}$ (e.g., SAMPLE-8DEA1C60)
 INSERT INTO qr_codes (qr_id, target_url, description, created_by, application_id) VALUES
     ('SAMPLE-8DEA1C60', 'https://www.example.com/product1', 'Sample Product 1 QR', 'admin@graceshoppee.tech', 1),
     ('MENU-B2C1D4E5', 'https://www.restaurant.com/menu', 'Restaurant Menu QR', 'chef@graceshoppee.tech', 2),
     ('EVENT-F6A7B8C9', 'https://www.eventbrite.com/event', 'Event Ticket QR', 'organizer@graceshoppee.tech', 3),
     ('MARKET-A1B2C3D4', 'https://www.marketing-campaign.com', 'Marketing Campaign QR', 'marketing@graceshoppee.tech', 4)
-    ON CONFLICT (qr_id) DO NOTHING;
+ON CONFLICT (qr_id) DO NOTHING;
 
 -- Reset sequence for qr_codes table if needed
 SELECT setval('qr_codes_id_seq', (SELECT MAX(id) FROM qr_codes));

@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Create Fresh Deployment Package for A2 Hosting
-# This script creates a clean deployment package with all latest fixes
+# Build Production Package for A2 Hosting
+# This script creates a complete deployment package including the new Content Publisher feature
 
 set -e
 
@@ -24,12 +24,16 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-echo "📦 Creating Fresh Deployment Package for A2 Hosting"
-echo "=================================================="
+print_warning() {
+    echo -e "${YELLOW}[WARNING]${NC} $1"
+}
+
+echo "📦 Building Production Package for A2 Hosting"
+echo "==============================================="
 
 # Define package name with timestamp
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-PACKAGE_NAME="qr-listener-docker-clean_${TIMESTAMP}"
+PACKAGE_NAME="qr-listener-production_${TIMESTAMP}"
 OUTPUT_DIR="deployment"
 PACKAGE_PATH="${OUTPUT_DIR}/${PACKAGE_NAME}"
 ZIP_FILE="${OUTPUT_DIR}/${PACKAGE_NAME}.zip"
@@ -58,6 +62,8 @@ rsync -av --progress \
     --exclude='.git' \
     --exclude='*.class' \
     --exclude='.mvn' \
+    --exclude='*.iml' \
+    --exclude='.idea' \
     backend/qr-listener-backend/ "${PACKAGE_PATH}/backend/qr-listener-backend/"
 
 # 2. Copy Frontend application (excluding node_modules and build files)
@@ -73,10 +79,12 @@ rsync -av --progress \
     --exclude='deployment-packages' \
     --exclude='docker-packages*' \
     --exclude='test-local-docker' \
+    --exclude='.env.local' \
+    --exclude='.env.development' \
     frontend/ "${PACKAGE_PATH}/frontend/"
 
-# Ensure frontend env.production has correct HTTP URLs (not HTTPS)
-print_status "  - Ensuring frontend env.production uses HTTP..."
+# Ensure frontend env.production has correct URLs
+print_status "  - Configuring frontend environment..."
 if [ -f "${PACKAGE_PATH}/frontend/env.production" ]; then
     sed -i.bak 's|https://graceshoppee.tech|http://graceshoppee.tech:8080|g' "${PACKAGE_PATH}/frontend/env.production"
     sed -i.bak 's|http://graceshoppee.tech[^:0-9]|http://graceshoppee.tech:8080|g' "${PACKAGE_PATH}/frontend/env.production"
@@ -84,7 +92,7 @@ if [ -f "${PACKAGE_PATH}/frontend/env.production" ]; then
     print_status "  - Updated env.production to use HTTP"
 fi
 
-# 3. Create Docker Compose file with correct A2 Hosting configuration
+# 3. Create Docker Compose file
 print_status "  - Creating Docker Compose file..."
 cat > "${PACKAGE_PATH}/docker-compose.yml" << 'EOF'
 version: '3.8'
@@ -192,18 +200,14 @@ services:
         condition: service_started
 
 volumes:
-  # Named volume persists data across deployments
-  # IMPORTANT: This volume persists data across deployments
-  # The startup script ensures the volume exists before starting services
   postgres_data:
-    name: qr_listener_postgres_data  # Fixed name ensures data persists across deployments
+    name: qr_listener_postgres_data
 EOF
 
-# 4. Create Nginx configuration for A2 Hosting (ports 8080 and 8443)
-# This config works without SSL certificates initially - SSL can be added later
-print_status "  - Creating Nginx configuration (HTTP only, SSL optional)..."
+# 4. Create Nginx configuration
+print_status "  - Creating Nginx configuration..."
 cat > "${PACKAGE_PATH}/nginx-config.conf" << 'EOF'
-# HTTP Server (port 80 inside container, mapped to 8080 on host) - Works immediately without SSL certificates
+# HTTP Server (port 80 inside container, mapped to 8080 on host)
 server {
     listen 80;
     server_name graceshoppee.tech www.graceshoppee.tech localhost;
@@ -230,6 +234,24 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header X-Forwarded-Host $host;
         proxy_set_header X-Forwarded-Port $server_port;
+        
+        # CORS headers (for cross-origin requests)
+        add_header 'Access-Control-Allow-Origin' '*' always;
+        add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS, PATCH' always;
+        add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization,X-User-Id,x-user-id' always;
+        add_header 'Access-Control-Allow-Credentials' 'true' always;
+        
+        # Handle preflight requests
+        if ($request_method = 'OPTIONS') {
+            add_header 'Access-Control-Allow-Origin' '*';
+            add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS, PATCH';
+            add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization,X-User-Id,x-user-id';
+            add_header 'Access-Control-Allow-Credentials' 'true';
+            add_header 'Access-Control-Max-Age' 1728000;
+            add_header 'Content-Type' 'text/plain; charset=utf-8';
+            add_header 'Content-Length' 0;
+            return 204;
+        }
         
         # Cache control
         proxy_cache_bypass $http_upgrade;
@@ -268,79 +290,6 @@ server {
         log_not_found off;
     }
 }
-
-# HTTPS Server (port 443 inside container, mapped to 8443 on host) - Only works after SSL certificates are obtained
-# Uncomment and configure this section after running certbot
-# To enable SSL:
-# 1. Run: docker-compose run --rm certbot
-# 2. Uncomment the server block below
-# 3. Restart nginx: docker-compose restart nginx
-
-# server {
-#     listen 443 ssl http2;
-#     server_name graceshoppee.tech www.graceshoppee.tech;
-# 
-#     # SSL Configuration (requires certbot first)
-#     ssl_certificate /etc/letsencrypt/live/graceshoppee.tech/fullchain.pem;
-#     ssl_certificate_key /etc/letsencrypt/live/graceshoppee.tech/privkey.pem;
-#     ssl_protocols TLSv1.2 TLSv1.3;
-#     ssl_ciphers ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES256-GCM-SHA384;
-#     ssl_prefer_server_ciphers off;
-#     ssl_session_cache shared:SSL:10m;
-#     ssl_session_timeout 10m;
-# 
-#     # Security headers
-#     add_header X-Frame-Options DENY;
-#     add_header X-Content-Type-Options nosniff;
-#     add_header X-XSS-Protection "1; mode=block";
-#     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-# 
-#     # Increase timeouts
-#     proxy_connect_timeout 300s;
-#     proxy_send_timeout 300s;
-#     proxy_read_timeout 300s;
-#     send_timeout 300s;
-# 
-#     # Backend API
-#     location /api/ {
-#         proxy_pass http://backend:8080;
-#         proxy_http_version 1.1;
-#         proxy_set_header Upgrade $http_upgrade;
-#         proxy_set_header Connection 'upgrade';
-#         proxy_set_header Host $host;
-#         proxy_set_header X-Real-IP $remote_addr;
-#         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-#         proxy_set_header X-Forwarded-Proto $scheme;
-#         proxy_set_header X-Forwarded-Host $host;
-#         proxy_set_header X-Forwarded-Port $server_port;
-#         proxy_cache_bypass $http_upgrade;
-#         proxy_buffering off;
-#     }
-# 
-#     # Frontend
-#     location / {
-#         proxy_pass http://frontend:3000;
-#         proxy_http_version 1.1;
-#         proxy_set_header Upgrade $http_upgrade;
-#         proxy_set_header Connection 'upgrade';
-#         proxy_set_header Host $host;
-#         proxy_set_header X-Real-IP $remote_addr;
-#         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-#         proxy_set_header X-Forwarded-Proto $scheme;
-#         proxy_cache_bypass $http_upgrade;
-#     }
-# 
-#     # Let's Encrypt challenge
-#     location /.well-known/acme-challenge/ {
-#         root /var/www/certbot;
-#     }
-# 
-#     # Favicon
-#     location = /favicon.ico {
-#         access_log off;
-#         log_not_found off;
-#     }
-# }
 EOF
 
 # 5. Copy database initialization script
@@ -380,12 +329,17 @@ if ! docker info > /dev/null 2>&1; then
     exit 1
 fi
 
+# Stop and remove old containers with same names (preserves volumes)
+print_status "Cleaning up old containers (preserves data)..."
+docker stop qr-listener-redis-prod qr-listener-postgres-prod qr-listener-backend-prod qr-listener-frontend-prod qr-listener-nginx-prod qr-listener-certbot-prod 2>/dev/null || true
+docker rm qr-listener-redis-prod qr-listener-postgres-prod qr-listener-backend-prod qr-listener-frontend-prod qr-listener-nginx-prod qr-listener-certbot-prod 2>/dev/null || true
+
 # Check if database volume exists, create if it doesn't
 VOLUME_NAME="qr_listener_postgres_data"
 if docker volume ls | grep -q "$VOLUME_NAME"; then
     print_status "📦 Found existing database volume: $VOLUME_NAME"
     print_warning "⚠️  Existing database data will be preserved"
-    print_status "   All your QR codes and data are safe!"
+    print_status "   All your QR codes and publications are safe!"
 else
     print_status "📦 Creating new database volume: $VOLUME_NAME"
     print_status "   (First deployment - database will be initialized)"
@@ -393,7 +347,6 @@ else
 fi
 
 # Start services (this will reuse existing volumes if they exist)
-# Using --remove-orphans to clean up old containers, but NOT removing volumes
 print_status "Starting services..."
 print_warning "⚠️  Using 'docker-compose up -d' which preserves volumes and existing data"
 print_warning "⚠️  Data will NOT be lost - volumes persist across deployments"
@@ -408,6 +361,8 @@ docker-compose ps
 
 print_success "✅ Application started!"
 print_status "Access at: http://graceshoppee.tech:8080"
+print_status "  - Admin Dashboard: http://graceshoppee.tech:8080/dashboard"
+print_status "  - Content Publisher: http://graceshoppee.tech:8080/publisher/dashboard"
 print_success "💾 Database data is preserved from previous deployment"
 EOF
 
@@ -465,14 +420,24 @@ EOF
 # 9. Create README
 print_status "  - Creating README..."
 cat > "${PACKAGE_PATH}/README.md" << 'EOF'
-# QR Listener Deployment Package
+# QR Listener Production Deployment Package
+
+## Features Included
+
+- ✅ **QR Code Management**: Generate, manage, and track QR codes
+- ✅ **Content Publisher**: Create beautiful biographies and family stories
+  - Multi-step publication wizard
+  - Photo upload and gallery
+  - Rich text editor
+  - Public viewing pages
+  - Social sharing
 
 ## Quick Start
 
 1. Extract the package:
    ```bash
-   unzip qr-listener-docker-clean_*.zip
-   cd qr-listener-docker-clean_*
+   unzip qr-listener-production_*.zip
+   cd qr-listener-production_*
    ```
 
 2. Make scripts executable:
@@ -487,8 +452,10 @@ cat > "${PACKAGE_PATH}/README.md" << 'EOF'
 
 ## Access
 
-- Frontend: http://graceshoppee.tech:8080
-- Backend API: http://graceshoppee.tech:8080/api
+- **Main Site**: http://graceshoppee.tech:8080
+- **Admin Dashboard**: http://graceshoppee.tech:8080/dashboard
+- **Content Publisher**: http://graceshoppee.tech:8080/publisher/dashboard
+- **Backend API**: http://graceshoppee.tech:8080/api
 
 ## Management
 
@@ -503,9 +470,7 @@ cat > "${PACKAGE_PATH}/README.md" << 'EOF'
 
 - Docker volumes persist your data
 - The `postgres_data` volume survives container restarts
-- Use `docker-compose down` (NOT `docker-compose down -v`) to preserve data
-- The init script uses `ON CONFLICT DO NOTHING` to prevent overwriting existing data
-- See `SAFE_DEPLOYMENT_GUIDE.md` for detailed information
+- QR codes and publications are preserved automatically
 
 ## Ports
 
@@ -517,41 +482,45 @@ cat > "${PACKAGE_PATH}/README.md" << 'EOF'
 - Redis: 6379
 EOF
 
-# 10. Copy safe deployment guide
-print_status "  - Copying deployment documentation..."
-cp deployment/SAFE_DEPLOYMENT_GUIDE.md "${PACKAGE_PATH}/" 2>/dev/null || true
-
-# 11. Create package info
+# 10. Create package info
 cat > "${PACKAGE_PATH}/PACKAGE_INFO.txt" << EOF
-QR Listener Fresh Deployment Package
+QR Listener Production Deployment Package
 Created: $(date)
 Package: ${PACKAGE_NAME}
-Version: 1.0.0
+Version: 2.0.0
 
-Latest Fixes Included:
-- ✅ Custom QR size download (cm to pixels conversion)
-- ✅ Edit QR code functionality
-- ✅ Redirect URL fix (uses environment variable)
-- ✅ CORS configuration updated
-- ✅ Nginx ports configured for A2 Hosting (8080, 8443)
-- ✅ Backend port mapping (8081:8080)
-- ✅ All hardcoded URLs removed from frontend
-- ✅ Database data preservation across deployments
+Features Included:
+- ✅ QR Code Management (Generate, Edit, Track)
+- ✅ Content Publisher (Biographies & Family Stories)
+  - Multi-step publication wizard
+  - Photo upload with drag & drop
+  - Rich text editor
+  - Photo gallery with lightbox
+  - Public viewing pages
+  - Social sharing integration
+- ✅ Analytics Dashboard
+- ✅ Search and Filtering
+
+Technical Details:
+- Backend: Spring Boot 3.2.0 (Java 17)
+- Frontend: Next.js 14 (React 18)
+- Database: PostgreSQL 15
+- Cache: Redis 7
+- Reverse Proxy: Nginx
+- Containerization: Docker Compose
 
 Data Safety:
 - ✅ Database volumes persist across deployments
 - ✅ Init script uses ON CONFLICT to prevent data loss
 - ✅ Startup script checks for existing volumes
-- ✅ See SAFE_DEPLOYMENT_GUIDE.md for details
 
 Files:
-- backend/: Spring Boot application
-- frontend/: Next.js application
+- backend/: Spring Boot application (includes Content Publisher API)
+- frontend/: Next.js application (includes Content Publisher UI)
 - docker-compose.yml: Docker configuration
 - nginx-config.conf: Nginx reverse proxy config
 - startup.sh: Startup script (preserves data)
 - monitor.sh: Monitoring script
-- SAFE_DEPLOYMENT_GUIDE.md: Data preservation guide
 EOF
 
 # Create the zip archive
@@ -562,7 +531,7 @@ print_status "Creating zip package..."
 rm -rf "${PACKAGE_PATH}"
 
 # Show results
-print_success "✅ Fresh deployment package created!"
+print_success "✅ Production package created!"
 print_success "📦 Package: ${ZIP_FILE}"
 print_success "📏 Size: $(du -h "${ZIP_FILE}" | awk '{print $1}')"
 
@@ -570,6 +539,13 @@ print_status "📋 Next Steps:"
 echo "1. Upload ${ZIP_FILE} to A2 Hosting via FileZilla"
 echo "2. Extract: unzip ${PACKAGE_NAME}.zip"
 echo "3. Run: cd ${PACKAGE_NAME} && ./startup.sh"
+
+print_status "✨ Package includes:"
+echo "  - QR Code Management"
+echo "  - Content Publisher (NEW!)"
+echo "  - Complete Docker setup"
+echo "  - All dependencies"
+echo "  - Data preservation"
 
 print_success "🎉 Ready for deployment!"
 

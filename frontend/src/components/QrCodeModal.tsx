@@ -37,12 +37,19 @@ export default function QrCodeModal({ qrCode, onClose }: QrCodeModalProps) {
   const [activeTab, setActiveTab] = useState<'details' | 'analytics' | 'settings'>('details')
   const [copied, setCopied] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
+  const [customSizeCm, setCustomSizeCm] = useState<number>(5) // Default 5 cm
   const [editData, setEditData] = useState({
     targetUrl: qrCode.targetUrl,
     description: qrCode.description,
     isActive: qrCode.isActive,
   })
   const queryClient = useQueryClient()
+
+  // Convert cm to pixels (using 300 DPI for print quality: 1 cm = 118.11 pixels)
+  const cmToPixels = (cm: number): number => {
+    // At 300 DPI: 1 inch = 2.54 cm, so 1 cm = 300/2.54 ≈ 118.11 pixels
+    return Math.round(cm * 118.11)
+  }
 
   // Update mutation
   const updateMutation = useMutation({
@@ -320,21 +327,61 @@ export default function QrCodeModal({ qrCode, onClose }: QrCodeModalProps) {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Download Options
               </label>
-              <div className="space-y-2">
-                <a
-                  href={qrCode.downloadUrl || `${appConfig.api.baseUrl}/api/qr/${qrCode.qrId}/download?size=256`}
-                  download
-                  className="btn-secondary text-sm block text-center"
-                >
-                  Download PNG (256x256)
-                </a>
-                <a
-                  href={`${appConfig.api.baseUrl}/api/qr/${qrCode.qrId}/download?size=512`}
-                  download
-                  className="btn-secondary text-sm block text-center"
-                >
-                  Download PNG (512x512)
-                </a>
+              <div className="space-y-4">
+                {/* Standard sizes */}
+                <div className="space-y-2">
+                  <p className="text-xs text-gray-500 mb-2">Standard Sizes:</p>
+                  <a
+                    href={qrCode.downloadUrl || `${appConfig.api.baseUrl}/api/qr/${qrCode.qrId}/download?size=256`}
+                    download
+                    className="btn-secondary text-sm block text-center"
+                  >
+                    Download PNG (256x256 pixels)
+                  </a>
+                  <a
+                    href={`${appConfig.api.baseUrl}/api/qr/${qrCode.qrId}/download?size=512`}
+                    download
+                    className="btn-secondary text-sm block text-center"
+                  >
+                    Download PNG (512x512 pixels)
+                  </a>
+                </div>
+
+                {/* Custom size in cm */}
+                <div className="border-t pt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Custom Size (in centimeters)
+                  </label>
+                  <div className="flex items-center space-x-3">
+                    <input
+                      type="number"
+                      min="1"
+                      max="50"
+                      step="0.1"
+                      value={customSizeCm}
+                      onChange={(e) => {
+                        const value = parseFloat(e.target.value)
+                        if (!isNaN(value) && value >= 1 && value <= 50) {
+                          setCustomSizeCm(value)
+                        }
+                      }}
+                      className="input-field flex-1"
+                      placeholder="Enter size in cm (1-50)"
+                    />
+                    <span className="text-sm text-gray-600 whitespace-nowrap">cm</span>
+                    <a
+                      href={`${appConfig.api.baseUrl}/api/qr/${qrCode.qrId}/download?size=${cmToPixels(customSizeCm)}`}
+                      download
+                      className="btn-primary text-sm px-4 py-2 whitespace-nowrap"
+                      title={`Download QR code at ${customSizeCm}cm (${cmToPixels(customSizeCm)}x${cmToPixels(customSizeCm)} pixels)`}
+                    >
+                      Download
+                    </a>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Size: {customSizeCm}cm × {customSizeCm}cm ({cmToPixels(customSizeCm)} × {cmToPixels(customSizeCm)} pixels at 300 DPI)
+                  </p>
+                </div>
               </div>
             </div>
 

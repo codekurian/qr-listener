@@ -1,0 +1,109 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    container_name: qr-listener-postgres-local
+    environment:
+      POSTGRES_DB: qr_listener
+      POSTGRES_USER: qr_user
+      POSTGRES_PASSWORD: local_dev_password
+    volumes:
+      - postgres_data_local:/var/lib/postgresql/data
+      - ./scripts/init-db-prod.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U qr_user -d qr_listener"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - qr-listener-network
+
+  # Redis (Optional - for caching)
+  redis:
+    image: redis:7-alpine
+    container_name: qr-listener-redis-local
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    networks:
+      - qr-listener-network
+
+  # Backend - Spring Boot
+  backend:
+    image: eclipse-temurin:17-jdk
+    container_name: qr-listener-backend-local
+    working_dir: /app
+    command: >
+      sh -c "
+      apt-get update && apt-get install -y maven &&
+      mvn clean package -DskipTests -Dmaven.test.skip=true &&
+      java -Xmx512m -Xms256m -jar target/qr-listener-backend-1.0.0.jar
+      "
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/qr_listener
+      SPRING_DATASOURCE_USERNAME: qr_user
+      SPRING_DATASOURCE_PASSWORD: local_dev_password
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      SERVER_PORT: 8080
+      MAVEN_OPTS: "-Xmx512m -Xms256m"
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+    volumes:
+      - ./backend/qr-listener-backend:/app
+      - maven_cache:/root/.m2
+    networks:
+      - qr-listener-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/api/qr/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  # Frontend - Next.js
+  frontend:
+    image: node:18-alpine
+    container_name: qr-listener-frontend-local
+    working_dir: /app
+    command: sh -c "npm install && npm run dev"
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:8080
+      PORT: 3000
+      NODE_ENV: development
+      WATCHPACK_POLLING: "true"
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    networks:
+      - qr-listener-network
+
+volumes:
+  postgres_data_local:
+    name: qr_listener_postgres_local
+  maven_cache:
+    name: qr_listener_maven_cache
+
+networks:
+  qr-listener-network:
+    name: qr-listener-network
+

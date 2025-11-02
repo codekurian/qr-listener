@@ -20,6 +20,9 @@ const nextConfig = {
     // API
     NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080',
     
+    // Base URL for public publication links (frontend domain) - A2 Hosting uses HTTP
+    NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL || 'http://graceshoppee.tech:8080',
+    
     // NextAuth (for when auth is enabled)
     NEXTAUTH_URL: process.env.NEXTAUTH_URL || 'http://localhost:3000',
     NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET || 'dev-secret',

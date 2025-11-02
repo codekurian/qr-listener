@@ -416,3 +416,58 @@ body {
   color: #0ea5e9;
   border: 1px solid rgba(14, 165, 233, 0.2);
 }
+
+/* Content Publisher Styles - Warm & Elegant Theme */
+.bg-cream {
+  background-color: #FEFCF8;
+}
+
+.bg-warm {
+  background-color: #F5F1EB;
+}
+
+.text-warm-gold {
+  color: #C9A961;
+}
+
+.bg-warm-gold {
+  background-color: #C9A961;
+}
+
+/* Photo Gallery Custom Styles */
+.photo-gallery-container {
+  width: 100%;
+  height: 100%;
+}
+
+.photo-gallery-container .image-gallery {
+  height: 100%;
+}
+
+.photo-gallery-container .image-gallery-slide {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+.photo-gallery-container .image-gallery-image {
+  max-height: 80vh;
+  object-fit: contain;
+}
+
+/* Print Styles for Publications */
+@media print {
+  header,
+  .no-print {
+    display: none !important;
+  }
+  
+  main {
+    padding: 0 !important;
+  }
+  
+  .prose {
+    max-width: 100% !important;
+  }
+}

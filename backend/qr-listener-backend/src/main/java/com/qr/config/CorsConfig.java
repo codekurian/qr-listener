@@ -35,7 +35,7 @@ public class CorsConfig implements WebMvcConfigurer {
                     "http://45.4.172.217:8080"
                 )
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH")
-                .allowedHeaders("*")
+                .allowedHeaders("*", "X-User-Id", "x-user-id", "Content-Type", "Authorization")
                 .allowCredentials(true)
                 .maxAge(3600);
     }

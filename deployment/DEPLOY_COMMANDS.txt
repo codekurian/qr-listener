@@ -1,0 +1,13 @@
+cd /app/qr-listener-production_*
+docker-compose down
+cd /app
+unzip -o qr-listener-production_20251101_212924.zip
+cd qr-listener-production_20251101_212924
+chmod +x *.sh
+./startup.sh
+docker logs -f qr-listener-backend-prod
+docker-compose ps
+curl http://localhost:8080/api/qr/health
+curl http://localhost:8080/api/publisher/publications/stats
+curl -I http://localhost:8080
+./monitor.sh status

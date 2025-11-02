@@ -8,7 +8,9 @@ import {
   ChartBarIcon, 
   CogIcon,
   PlusIcon,
-  MagnifyingGlassIcon
+  MagnifyingGlassIcon,
+  DocumentTextIcon,
+  BookOpenIcon
 } from '@heroicons/react/24/outline'
 
 const navigation = [
@@ -19,6 +21,11 @@ const navigation = [
   { name: 'Analytics', href: '/analytics', icon: ChartBarIcon },
   { name: 'Settings', href: '/settings', icon: CogIcon },
   { name: 'Configuration', href: '/config', icon: CogIcon },
+]
+
+const publisherNavigation = [
+  { name: 'Publisher Dashboard', href: '/publisher/dashboard', icon: BookOpenIcon },
+  { name: 'Create Publication', href: '/publisher/create', icon: DocumentTextIcon },
 ]
 
 export default function Sidebar() {
@@ -36,23 +43,47 @@ export default function Sidebar() {
       </div>
 
       <nav className="space-y-2">
-        {navigation.map((item) => {
-          const isActive = pathname === item.href
-          return (
-            <Link
-              key={item.name}
-              href={item.href}
-              className={`nav-link ${
-                isActive
-                  ? 'active'
-                  : ''
-              }`}
-            >
-              <item.icon className="w-5 h-5" />
-              <span className="font-medium">{item.name}</span>
-            </Link>
-          )
-        })}
+        <div className="mb-4">
+          <p className="text-white/60 text-xs font-semibold uppercase mb-2 px-3">QR Codes</p>
+          {navigation.map((item) => {
+            const isActive = pathname === item.href
+            return (
+              <Link
+                key={item.name}
+                href={item.href}
+                className={`nav-link ${
+                  isActive
+                    ? 'active'
+                    : ''
+                }`}
+              >
+                <item.icon className="w-5 h-5" />
+                <span className="font-medium">{item.name}</span>
+              </Link>
+            )
+          })}
+        </div>
+        
+        <div className="mb-4 pt-4 border-t border-white/20">
+          <p className="text-white/60 text-xs font-semibold uppercase mb-2 px-3">Content Publisher</p>
+          {publisherNavigation.map((item) => {
+            const isActive = pathname === item.href
+            return (
+              <Link
+                key={item.name}
+                href={item.href}
+                className={`nav-link ${
+                  isActive
+                    ? 'active'
+                    : ''
+                }`}
+              >
+                <item.icon className="w-5 h-5" />
+                <span className="font-medium">{item.name}</span>
+              </Link>
+            )
+          })}
+        </div>
       </nav>
 
       <div className="mt-8 pt-6 border-t border-white/20">

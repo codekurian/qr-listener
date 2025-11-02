@@ -117,18 +117,48 @@ NEXTAUTH_URL=http://localhost:3000
 
 ## Development
 
-### Backend
+### Quick Build (Recommended)
+Use the build script for local development:
 ```bash
-cd backend/qr-redirect-service
+./scripts/build-local.sh
+```
+
+This will:
+- Build the Spring Boot backend
+- Install frontend dependencies
+- Prepare everything for development
+
+### Manual Setup
+
+#### Backend
+```bash
+cd backend/qr-listener-backend
 mvn spring-boot:run
 ```
 
-### Frontend
+#### Frontend
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
+
+## Building for Production
+
+To create a production deployment package for A2 Hosting:
+
+```bash
+./scripts/build-production.sh
+```
+
+This creates a complete zip package in the `deployment/` directory that includes:
+- Backend and frontend source code
+- Docker Compose configuration
+- Nginx reverse proxy setup
+- Startup and monitoring scripts
+- Complete documentation
+
+For detailed build instructions, see `scripts/BUILD_GUIDE.md`
 
 ## Deployment
 
